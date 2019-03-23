@@ -1,0 +1,8 @@
+#!/bin/bash
+
+function dims(){
+    echo $1
+
+}
+
+dims $1

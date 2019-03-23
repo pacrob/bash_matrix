@@ -1,0 +1,291 @@
+#!/bin/bash
+
+#Paul Robinson - robinsop - 933316287
+#CS344 Spring 2018
+#Program 1 - matrix
+
+
+
+function dims(){
+
+
+    matrix=$1
+    # test for correct number of arguments
+    [ $# -gt 1 ] && { echo "invalid number of arguments" >&2; exit 1; }
+    [ $# -lt 1 ] && { tempfile="tmp"; cat > "$tempfile$$"; matrix=$tempfile$$; }
+
+    # test if the argument is a file, if so, test if it's readable
+    status=0
+    [ -f $1 ] && { test -r $1; status=$?; }
+    [ $status -ne 0 ] && { echo "file $1 cannot be read" >&2; exit 1; }
+    [ -f $1 ] || { echo "no such file exists" >&2; exit 1; }
+
+    # get row and col counts
+    row_count=$(wc -l < $matrix )
+    line1=$(head -n 1 $matrix)
+    col_count=0
+    for num in $line1
+    do
+        ((col_count++))
+    done
+        
+    # echo out rows then cols to a temp file, the cat the tempfile
+    tempAfile="tmp2"
+    echo $row_count $col_count > $tempAfile$$
+    cat $tempAfile$$
+    # delete the temp file if it exists
+    [ -f $tempfile$$ ] && rm -f $tempfile$$;
+    [ -f $tempAfile$$ ] && rm -f $tempAfile$$;
+}
+
+
+
+function transpose(){
+    matrix=$1
+    # test for correct number of arguments
+    [ $# -gt 1 ] && { echo "invalid number of arguments" >&2; exit 1; }
+    [ $# -lt 1 ] && { tempfile="tmp"; cat > "$tempfile$$"; matrix=$tempfile$$; }
+
+    # test if the argument is a file, if so, test if it's readable
+    status=0
+    [ -f $1 ] && { test -r $1; status=$?; }
+    [ $status -ne 0 ] && { echo "file $1 cannot be read" >&2; exit 1; }
+
+    # get a count of columns
+    line1=$(head -n 1 $matrix)
+    col_count=0
+    for num in $line1
+    do
+        ((col_count++))
+    done
+    
+    ##
+    # take vertical cuts of the file and cat them to a temp file horizontally
+    ##
+    tempAfile="tmp2"
+    
+    # take cuts and append to the temp file
+    for i in $(seq 1 $col_count);
+    do
+        tempy=$(cut -f $i $matrix)
+        echo $tempy >> $tempAfile$$
+    done < $matrix
+
+    # use translate to convert spaces into tabs and send to stdout
+    tr " " "\t" < $tempAfile$$ 
+
+    # delete the temp file if it exists
+    [ -f $tempfile$$ ] && rm -f $tempfile$$;
+    [ -f $tempAfile$$ ] && rm -f $tempAfile$$;
+
+}
+
+
+function mean(){
+    matrix=$1
+    # test for correct number of arguments
+    [ $# -gt 1 ] && { echo "invalid number of arguments" >&2; exit 1; }
+    [ $# -lt 1 ] && { tempfile="tmp"; cat > "$tempfile$$"; matrix=$tempfile$$; }
+
+    # test if the argument is a file, if so, test if it's readable
+    status=0
+    [ -f $1 ] && { test -r $1; status=$?; }
+    [ $status -ne 0 ] && { echo "file $1 cannot be read" >&2; exit 1; }
+
+    # get a count of columns
+    line1=$(head -n 1 $matrix)
+    col_count=0
+    for num in $line1
+    do
+        ((col_count++))
+    done
+
+    # create a temp file to write the calculated means to
+    tempAfile="tmp2"
+    
+    # take successive cuts and append the mean of that column to the temp file
+    for i in $(seq 1 $col_count);
+    do
+        tempy=$(cut -f $i $matrix)
+
+        counter=0
+        accum=0
+        for j in $tempy;
+        do
+            ((accum += $j))
+            ((counter ++))
+        done
+
+        col_mean=$(( ($accum + ($counter / 2) * ( ($accum>0)*2-1 )) / $counter))
+
+        # for all columns except the last, echo the number plus a tab
+        # for the last, just the number and the normal newline
+        if [[ $i -lt $col_count ]]
+        then
+            echo -ne $col_mean'\t' >> $tempAfile$$
+        else
+            echo $col_mean >> $tempAfile$$
+        fi
+        
+    done < $matrix
+
+    cat $tempAfile$$
+
+    # delete the temp file if it exists
+    [ -f $tempfile$$ ] && rm -f $tempfile$$;
+    [ -f $tempAfile$$ ] && rm -f $tempAfile$$;
+
+}
+
+function add(){
+    mtxA=$1
+    mtxB=$2
+    # test for correct number of arguments
+    [ $# -ne 2 ] && { echo "invalid number of arguments" >&2; exit 1; }
+
+    # test if the arguments are files, if so, test if readable
+    status=0
+    [ -f $1 ] && { test -r $1; status=$?; }
+    [ $status -ne 0 ] && { echo "file $1 cannot be read" >&2; exit 1; }
+    [ -f $2 ] && { test -r $2; status=$?; }
+    [ $status -ne 0 ] && { echo "file $2 cannot be read" >&2; exit 1; }
+
+    # get row and col counts for both matrices, error if they differ
+    row_countA=$(wc -l < $mtxA )
+    row_countB=$(wc -l < $mtxB )
+    [ $row_countA -ne $row_countB ] && { echo "row counts differ" >&2; exit 1; }
+
+    line1A=$(head -n 1 $mtxA)
+    line1B=$(head -n 1 $mtxB)
+    col_countA=0
+    col_countB=0
+    for numa in $line1A
+    do
+        ((col_countA++))
+    done
+
+    for numb in $line1B
+    do
+        ((col_countB++))
+    done
+
+    [ $col_countA -ne $col_countB ] && { echo "column counts differ" >&2; exit 1; }
+
+    # take each row from each file and add elementwise, echo to new tempfile
+    tempfile="tmp"
+    tempAfile="tmpa"
+    tempBfile="tmpb"
+
+    for i in $(seq 1 $row_countA);
+    do
+        # take each row and put it in a temp file
+        rowA=$( head -$i $mtxA | tail -1 )
+        rowB=$( head -$i $mtxB | tail -1 )
+        echo $rowA > $tempAfile$$
+        echo $rowB > $tempBfile$$
+        for j in $(seq 1 $col_countA);
+        do
+            # cut both temp files to add elementwise
+            numA=$( cut -d ' ' -f $j $tempAfile$$ )
+            numB=$( cut -d ' ' -f $j $tempBfile$$ )
+            sum=$( expr $numA + $numB )
+
+            if [[ $j -lt $col_countA ]]
+            then
+                echo -ne $sum'\t' >> $tempfile$$
+            else
+                echo $sum >> $tempfile$$
+            fi
+        done
+    done
+    cat $tempfile$$
+    
+    # delete the temp files if they exist
+    [ -f $tempfile$$ ] && rm -f $tempfile$$;
+    [ -f $tempAfile$$ ] && rm -f $tempAfile$$;
+    [ -f $tempBfile$$ ] && rm -f $tempBfile$$;
+}
+
+function multiply(){
+    mtxA=$1
+    mtxB=$2
+    # test for correct number of arguments
+    [ $# -ne 2 ] && { echo "invalid number of arguments" >&2; exit 1; }
+
+    # test if the arguments are files, if so, test if readable
+    status=0
+    [ -f $1 ] && { test -r $1; status=$?; }
+    [ $status -ne 0 ] && { echo "file $1 cannot be read" >&2; exit 1; }
+    [ -f $2 ] && { test -r $2; status=$?; }
+    [ $status -ne 0 ] && { echo "file $2 cannot be read" >&2; exit 1; }
+
+    # get row and col counts for both matrices, error if A's cols differ from B's rows
+    row_countA=$(wc -l < $mtxA )
+    row_countB=$(wc -l < $mtxB )
+
+    line1A=$(head -n 1 $mtxA)
+    line1B=$(head -n 1 $mtxB)
+    col_countA=0
+    col_countB=0
+    for numa in $line1A
+    do
+        ((col_countA++))
+    done
+
+    for numb in $line1B
+    do
+        ((col_countB++))
+    done
+
+    [ $col_countA -ne $row_countB ] && { echo "dimensions don't allow multiplication" >&2; exit 1; }
+
+    tempfile="tmp"
+    tempAfile="tmpa"
+    tempBfile="tmpb"
+
+    # take each row of A and get its dot product with each column of B, echo to file
+    for i in $(seq 1 $row_countA);
+    do
+        for j in $(seq 1 $col_countB);
+        do
+            # get A's row and B's col
+            rowA=$( head -$i $mtxA | tail -1 )
+            echo $rowA > $tempAfile$$
+            colB=$(cut -f $j $mtxB)
+            echo $colB > $tempBfile$$
+
+            accum=0
+            for k in $(seq 1 $col_countA);
+            do
+                # cut each file and multiply elementwise, add product to accumulator
+                numA=$(cut -d ' ' -f $k $tempAfile$$)
+                numB=$(cut -d ' ' -f $k $tempBfile$$)
+                product=$(( $numA * $numB ))
+                (( accum+=$product )) 
+            done
+            echo -ne $accum'\t' >> $tempfile$$
+        done
+        # truncate the trailing tab and replace with a newline
+        truncate -s-1 $tempfile$$
+        echo '' >> $tempfile$$
+    done
+    cat $tempfile$$
+
+    # delete the temp files if they exist
+    [ -f $tempfile$$ ] && rm -f $tempfile$$;
+    [ -f $tempAfile$$ ] && rm -f $tempAfile$$;
+    [ -f $tempBfile$$ ] && rm -f $tempBfile$$;
+}
+
+# trap function to clean temp files if something goes wrong
+function cleanup {
+    [ -f tmp$$ ] && rm -f tmp$$;
+    [ -f tmp2$$ ] && rm -f tmp2$$;
+    [ -f tmpa$$ ] && rm -f tmpa$$;
+    [ -f tmpb$$ ] && rm -f tmpb$$;
+}
+
+trap cleanup ERR EXIT
+
+# call the first argument as a function name, expand rest to arguments
+$1 "${@:2}"
